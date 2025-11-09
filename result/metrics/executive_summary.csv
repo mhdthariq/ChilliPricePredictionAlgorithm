@@ -1,0 +1,2 @@
+total_markets,total_models_trained,best_overall_model,best_overall_rmse,best_overall_mape,avg_holiday_improvement,hypothesis_validated,p_value
+5,6,LSTM,11933.27199616604,13.755331693375354,-6.445446283058889,No,0.052310845988891574
