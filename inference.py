@@ -1,14 +1,12 @@
 """
 Inference Script for Chili Price Prediction
-This script loads trained LSTM and ARIMA models and generates predictions in table format
+This script loads trained LSTM and ARIMA model results and generates predictions in table format
 Output: Actual Price | LSTM Price | ARIMA Price
 """
 
 import pandas as pd
 import numpy as np
 import joblib
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 import os
 import sys
 
@@ -17,10 +15,10 @@ def main():
     print("CHILI PRICE PREDICTION - INFERENCE")
     print("="*80)
     
-    # Check if models exist
-    lstm_model_path = 'models/lstm/lstm_holiday_model_all_markets.h5'
-    if not os.path.exists(lstm_model_path):
-        print(f"\n❌ Error: LSTM model not found at {lstm_model_path}")
+    # Check if results exist
+    lstm_results_path = 'result/metrics/lstm_detailed_results.pkl'
+    if not os.path.exists(lstm_results_path):
+        print(f"\n❌ Error: LSTM results not found at {lstm_results_path}")
         print("Please run train_lstm.py first to train the model.")
         sys.exit(1)
     
@@ -40,7 +38,11 @@ def main():
     LOOK_BACK = 30
     
     test_data = df_with_holidays.iloc[SPLIT_INDEX:]
-    test_dates = test_data.index[LOOK_BACK:LOOK_BACK + len(lstm_results['actual'])]
+    
+    # LSTM has predictions starting from LOOK_BACK days into test set
+    # ARIMA has predictions for entire test set
+    # We align them by using LSTM's dates as reference
+    test_dates = lstm_results['test_dates']
     
     print(f"\n✓ Data loaded")
     print(f"  Test period: {test_dates[0]} to {test_dates[-1]}")
@@ -61,14 +63,13 @@ def main():
         lstm_pred = lstm_results['predictions_with_holiday'][:, idx]  # Use best LSTM (with holidays)
         
         # Get ARIMA predictions for this market
-        arima_pred = arima_results[market]['arimax_forecast'].values  # Use ARIMAX (with holidays)
+        # ARIMA starts from beginning of test set, LSTM starts after LOOK_BACK
+        # So we need to skip first LOOK_BACK predictions from ARIMA
+        arima_full = arima_results[market]['arimax_forecast'].values  # Use ARIMAX (with holidays)
+        arima_pred = arima_full[LOOK_BACK:LOOK_BACK + len(actual)]
         
-        # Align lengths (ARIMA may have different length)
-        min_len = min(len(actual), len(lstm_pred), len(arima_pred))
-        actual = actual[:min_len]
-        lstm_pred = lstm_pred[:min_len]
-        arima_pred = arima_pred[:min_len]
-        dates = test_dates[:min_len]
+        # All should now be same length
+        dates = test_dates
         
         # Create DataFrame
         comparison_df = pd.DataFrame({
